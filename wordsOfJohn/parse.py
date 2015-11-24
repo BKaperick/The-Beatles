@@ -40,6 +40,7 @@ def parseInterview(filename = ""):
     new.close()
     parseFile(filename + 'interviewcut')
 
+
 def combineGood():
     total = open("total.txt", "w")
     files = [file for file in listdir() if file[:7] == "PARSED-"]

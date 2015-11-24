@@ -1,3 +1,14 @@
+#File to quickly generate naive neural nets
+#Each line is another layer, first number is input,
+#last line is output.
+#Every number must be positive
+#
+#First and last must match in/out size
+#
+#For example, mnist maps 784 -> 10
+#
+#
 784
 2
 3
+10

@@ -85,6 +85,7 @@ def sigma(val):
 def createNetwork(name = "network"):
     file = open(name + ".txt", "r")
     lines = list(file.readlines())
+    lines = [l for l in lines if l[0] != '#']
     inNodes = [InputNode() for i in range(int(lines[0]))]
     hiddenNodes = [[Node(inputs = int(lines[k-1])) for i in range(int(lines[k]))] for k in range(1,len(lines) - 1)]
     outputNodes = [Node(inputs = int(lines[-2])) for i in range(int(lines[-1]))]

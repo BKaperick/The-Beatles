@@ -1,6 +1,8 @@
 #Python library for dealing with random elements
 from random import *
 
+from os import path
+
 #Generator, takes a string and parameter k.  To use, it is assigned to a variable, (see textGen below) and every time
 #"next(textGen)" is called, the next k characters from the string are returned.  So for the initial string "Markov" and
 #k=2, subsequent "next" calls return "Ma", "ar", "rk", "ko", "ov".
@@ -24,17 +26,19 @@ def nextWord(string,k):
 
 
 #If words is true, then the script will sort the input text with the nextWord generator, else it'll use the nextK generator.
-words = False
+words = True
 #This is the (integer) size of chunks considered.  Either two words (if words=True) or two letters (if words=False)
 #Generally, coherence of the output improves as this parameter increases to a certain point.  If it is two high, then it mostly
 #ends up just quoting from the input document, which is not desired.
-param = 6
+param = 8
 
 
 #This block of commands reads the training data ("in.txt" in the current directory) and removes the annoying punctuation that
 #distracts from the meaning of the text.  (The in.txt I uploaded is the text of Alice in Wonderland)
 studyText = ""
-file = open("in.txt","r+")
+filename = "wordsOfJohn//total"#input("filename(/path): ")
+
+file = open(path.relpath(filename) + ".txt","r+")
 for line in file.readlines():
     line = line.lower()
     line = line.replace(".","")
@@ -108,6 +112,8 @@ def gibberish(length):
 
     while len(output) < length:
         last = choice(knowledge[last])
+        if '$' in last:
+                break
         output += last
     return output  
         

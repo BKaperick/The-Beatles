@@ -24,11 +24,11 @@ def nextWord(string,k):
 
 
 #If words is true, then the script will sort the input text with the nextWord generator, else it'll use the nextK generator.
-words = True
+words = False
 #This is the (integer) size of chunks considered.  Either two words (if words=True) or two letters (if words=False)
 #Generally, coherence of the output improves as this parameter increases to a certain point.  If it is two high, then it mostly
 #ends up just quoting from the input document, which is not desired.
-param = 1
+param = 6
 
 
 #This block of commands reads the training data ("in.txt" in the current directory) and removes the annoying punctuation that

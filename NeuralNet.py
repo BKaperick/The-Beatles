@@ -3,16 +3,17 @@ import os, struct
 from array import array as pyarray
 from math import *
 
+
 class Node:
-    def __init__(self, inputs = 1, weights = [1], threshold = 0):
+    def __init__(self, inputs, weights = [1], threshold = 0):
         self.inputs = inputs
         self.weights = np.transpose(np.matrix(weights))
-        if len(weights) != inputs:
-            self.weights = np.transpose(np.ones(inputs))
+        if len(weights) != len(inputs):
+            self.weights = np.transpose(np.ones(len(inputs), dtype=float))
         self.threshold = threshold
 
     def getOutput(self):
-        val = sum([self.inputs[i]*self.weights[i] for i in range(len(self.inputs))]) + self.threshold >= 0
+        val = sum([self.inputs[i].getOutput()*self.weights[i] for i in range(len(self.inputs))]) + self.threshold >= 0
         return 1 / (1 + exp(-val))
 
 class InputNode:
@@ -22,7 +23,7 @@ class InputNode:
         self.threshold = 1
 
     def getOutput(self):
-        return self.inputVal
+        return 1 / (1 + exp(-self.inputVal))
         
 class Network:
     def __init__(self, inNodes = [], hiddenNodes = [[]], outNodes = []):
@@ -34,8 +35,12 @@ class Network:
         self.nodes += [inNodes] + hiddenNodes + [outNodes]
         self.layers = len(self.nodes)
 
-    def getOutput(self):
-        return [n.getOutput() for n in self.outNodes]
+    def getOutput(self, inputVal):
+        self.loadInput(inputVal)
+        output = [n.getOutput() for n in self.outNodes]
+        print([n.inputVal for n in self.inNodes])
+        print(output)
+        return output.index(max(output))
 
     def loadInput(self, inputVector):
         for b in range(len(inputVector)):
@@ -55,40 +60,76 @@ class Network:
             L[l] = self.nodes[layer][l].threshold
         return np.transpose(np.matrix(L))
 
-    def feedForward(self, inputVector):
+    def feedForward(self, inputVector, label):
         self.loadInput(inputVector)
         Z = []
         Z.append(sigma(inputVector))
-        Y = np.transpose(np.matrix(inputVector))
+        Y = np.zeros(10)
+        Y[label] = 1
+        
         A = np.transpose(np.matrix(inputVector))
         for l in range(1, self.layers):
             W = self.weightMatr(l)
             b = self.bias(l)
-            print('w: ',W)
-            print('a: ',A)
-            print('b: ',b)
             Z.append(W*A + b)
-            A = sigma(Z[l])
-        sigmaPrime =  - np.array(Z[l]) + np.ones(len(Z[l]))
-        sigmaPrime = sigma(sigmaPrime)
-        sigmaPrime = A*sigmaPrime
-        return np.matrix(np.absolute(np.array(A - Y))*sigmaPrime)
+            A = np.array(sigma(Z[l]))
+        z = Z[l]
+        sigmaprime = sigmaPrime(Z[l])
+        finalError = np.matrix(np.absolute(A - Y)).transpose()*sigmaprime
+        return (Z, finalError)
+
+    def backProp(self, finalError, Z):
+        Delta = []
+        Delta.append(finalError)
+        for l in range(self.layers - 2, -1, -1):
+            W = self.weightMatr(l+1)
+            Delta.append(np.array(W.transpose()*Delta[-1])*sigmaPrime(Z[l]))
+        return Delta[::-1]
+
+    def gradDescent(self, learnRate, Delta, Z):
+        global z
+        z = (Delta, Z)
+        Z[0] = np.transpose(np.matrix(Z[0]))
+        for l in range(1,self.layers):
+            A = np.transpose(sigma(Z[l-1]))
+            delt = np.matrix(Delta[l], dtype=float)
+            gradMatr = np.transpose(delt*A)
+            for i,n in enumerate(self.nodes[l]):
+                for j,w in enumerate(self.nodes[l][i].weights):
+                    self.nodes[l][i].weights[j] -= learnRate*gradMatr[j,i]
+                self.nodes[l][i].threshold -= learnRate*delt[i]
+
+    def learn(self, inputVals, inputLabels, alpha):
+        counter = 1
+        for inputVal, inputLabel in zip(inputVals, inputLabels):
+            Z, finalError = self.feedForward(inputVal, inputLabel)
+            delta = self.backProp(finalError, Z)
+            self.gradDescent(alpha, delta, Z)
+            print(counter)
+            counter += 1
+
             
 def sigma(val):
-    print(type(val))
     if type(val) != type(1):
-        for i in range(len(val)):
-            val[i] = 1 / (1 + exp(-val[i]))
+        val = 1 / (1 + np.exp(-val))
         return val
     return 1 / (1 + exp(-val))
+
+def sigmaPrime(val):
+    return np.array(sigma(val))*np.array(sigma(np.matrix(np.ones(len(val))).transpose() - val))
+    
 
 def createNetwork(name = "network"):
     file = open(name + ".txt", "r")
     lines = list(file.readlines())
     lines = [l for l in lines if l[0] != '#']
     inNodes = [InputNode() for i in range(int(lines[0]))]
-    hiddenNodes = [[Node(inputs = int(lines[k-1])) for i in range(int(lines[k]))] for k in range(1,len(lines) - 1)]
-    outputNodes = [Node(inputs = int(lines[-2])) for i in range(int(lines[-1]))]
+    hiddenNodes = []
+    hiddenNodes.append([Node(inNodes) for i in range(int(lines[1]))])
+    for k in range(0, len(lines)-2):
+        hiddenNodes.append([Node(hiddenNodes[k]) for i in range(int(lines[k+1]))])
+        
+    outputNodes = [Node(hiddenNodes[-1]) for i in range(int(lines[-1]))]
     return Network(inNodes = inNodes, hiddenNodes = hiddenNodes, outNodes = outputNodes)
 
 def loadMnist(dataset="training", digits=np.arange(10), path="."):

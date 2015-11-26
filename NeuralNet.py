@@ -2,18 +2,22 @@ import numpy as np
 import os, struct
 from array import array as pyarray
 from math import *
+import random
 
+errorCollect = []
 
 class Node:
-    def __init__(self, inputs, weights = [1], threshold = 0):
+    def __init__(self, inputs, weights = None, threshold = 0):
         self.inputs = inputs
-        self.weights = np.transpose(np.matrix(weights))
-        if len(weights) != len(inputs):
-            self.weights = np.transpose(np.ones(len(inputs), dtype=float))
+        if weights != None:
+            self.weights = np.array(weights, dtype=float)
+        elif weights == None:
+            self.weights = np.array([np.random.uniform(-(1/len(inputs)), (1/len(inputs))) for i in range(len(inputs))], dtype=float)
         self.threshold = threshold
 
-    def getOutput(self):
-        val = sum([self.inputs[i].getOutput()*self.weights[i] for i in range(len(self.inputs))]) + self.threshold >= 0
+    def getOutput(self, inputVals):
+        print("calculating output")
+        val = sum([inputVals[i]*self.weights[i] for i in range(len(self.inputs))]) + self.threshold >= 0
         return 1 / (1 + exp(-val))
 
 class InputNode:
@@ -23,6 +27,7 @@ class InputNode:
         self.threshold = 1
 
     def getOutput(self):
+        print("getting input for output")
         return 1 / (1 + exp(-self.inputVal))
         
 class Network:
@@ -37,10 +42,13 @@ class Network:
 
     def getOutput(self, inputVal):
         self.loadInput(inputVal)
-        output = [n.getOutput() for n in self.outNodes]
-        print([n.inputVal for n in self.inNodes])
-        print(output)
-        return output.index(max(output))
+        current = inputVal
+        for l in range(1,self.layers):
+            nextVals = []
+            for i,n in enumerate(self.nodes[l]):
+                nextVals.append(n.getOutput(current))
+            current = nextVals
+        return current
 
     def loadInput(self, inputVector):
         for b in range(len(inputVector)):
@@ -61,34 +69,40 @@ class Network:
         return np.transpose(np.matrix(L))
 
     def feedForward(self, inputVector, label):
+        '''
+        Verified to work as expected
+        '''
         self.loadInput(inputVector)
         Z = []
-        Z.append(sigma(inputVector))
-        Y = np.zeros(10)
+        Z.append(inputVector)
+        Y = np.zeros(len(self.nodes[-1]))
         Y[label] = 1
-        
         A = np.transpose(np.matrix(inputVector))
         for l in range(1, self.layers):
             W = self.weightMatr(l)
             b = self.bias(l)
             Z.append(W*A + b)
             A = np.array(sigma(Z[l]))
-        z = Z[l]
-        sigmaprime = sigmaPrime(Z[l])
-        finalError = np.matrix(np.absolute(A - Y)).transpose()*sigmaprime
+        A = A.transpose()
+        finalError = np.absolute(A - Y).transpose()*sigmaPrime(Z[l])
         return (Z, finalError)
 
     def backProp(self, finalError, Z):
+        '''
+        Verified: works as expected
+        '''
         Delta = []
         Delta.append(finalError)
         for l in range(self.layers - 2, -1, -1):
             W = self.weightMatr(l+1)
+            print(np.shape(W.transpose()), np.shape(Delta[-1]), np.shape(sigmaPrime(Z[l])))
             Delta.append(np.array(W.transpose()*Delta[-1])*sigmaPrime(Z[l]))
         return Delta[::-1]
 
     def gradDescent(self, learnRate, Delta, Z):
-        global z
-        z = (Delta, Z)
+        '''
+        Verified: works as expected
+        '''
         Z[0] = np.transpose(np.matrix(Z[0]))
         for l in range(1,self.layers):
             A = np.transpose(sigma(Z[l-1]))
@@ -104,6 +118,7 @@ class Network:
         for inputVal, inputLabel in zip(inputVals, inputLabels):
             Z, finalError = self.feedForward(inputVal, inputLabel)
             delta = self.backProp(finalError, Z)
+            errorCollect.append(delta)
             self.gradDescent(alpha, delta, Z)
             print(counter)
             counter += 1
@@ -125,14 +140,13 @@ def createNetwork(name = "network"):
     lines = [l for l in lines if l[0] != '#']
     inNodes = [InputNode() for i in range(int(lines[0]))]
     hiddenNodes = []
-    hiddenNodes.append([Node(inNodes) for i in range(int(lines[1]))])
-    for k in range(0, len(lines)-2):
-        hiddenNodes.append([Node(hiddenNodes[k]) for i in range(int(lines[k+1]))])
-        
-    outputNodes = [Node(hiddenNodes[-1]) for i in range(int(lines[-1]))]
+    hiddenNodes.append([Node(inNodes, weights = [1 for i in range(len(inNodes))]) for i in range(int(lines[1]))])
+    for k in range(0, len(lines)-3):
+        hiddenNodes.append([Node(hiddenNodes[k], weights = [1 for i in range(len(hiddenNodes[k]))]) for i in range(int(lines[k+1]))])
+    outputNodes = [Node(hiddenNodes[-1], weights = [1 for i in range(len(hiddenNodes[-1]))]) for i in range(int(lines[-1]))]
     return Network(inNodes = inNodes, hiddenNodes = hiddenNodes, outNodes = outputNodes)
 
-def loadMnist(dataset="training", digits=np.arange(10), path="."):
+def loadMnist(dataset="training", num = 6000, digits=np.arange(10), path="."):
     """
     Loads MNIST files into 3D numpy arrays
     Adapted from: http://g.sweyla.com/blog/2012/mnist-numpy/
@@ -163,12 +177,32 @@ def loadMnist(dataset="training", digits=np.arange(10), path="."):
 
     images = []
     labels = []
-    for i in range(len(ind)):
+    for i in range(min(len(ind), num)):
         images.append(np.array(img[ ind[i]*rows*cols : (ind[i]+1)*rows*cols ]))
         labels.append(lbl[ind[i]])
-
     return images, labels
+
+def normalize(datasets):
+    squaredsum = 0
+    mean = 0
+    N = 0
+    for data in datasets:
+        squaredsum += sum([x^2 for x in data])
+        N += len(data)
+        mean += np.mean(data)
+    stdev = sqrt(squaredsum / N)
+    mean = mean / len(datasets)
+    
+    return [(data - mean)/stdev for data in datasets]
 
 if __name__ == '__main__':
 	network = createNetwork()
-	i,l = loadMnist()
+	print('network initialized')
+	i,l = loadMnist(num = 50)
+	#print('training data loaded')
+	#i = normalize(i[:50])
+	#print('data normalized')
+	#network.learn(i,l,.1)
+	#print('network taught')
+test1 = [np.array([1,.25,0])]
+labl1 = [2]

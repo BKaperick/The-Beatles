@@ -8,7 +8,7 @@
 #For example, mnist maps 784 -> 10
 #
 #
-3
+784
 2
 2
-3
+10

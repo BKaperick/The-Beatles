@@ -16,8 +16,7 @@ class Node:
         self.threshold = threshold
 
     def getOutput(self, inputVals):
-        print("calculating output")
-        val = sum([inputVals[i]*self.weights[i] for i in range(len(self.inputs))]) + self.threshold >= 0
+        val = sum([inputVals[i]*self.weights[i] for i in range(len(self.inputs))]) + self.threshold
         return 1 / (1 + exp(-val))
 
 class InputNode:
@@ -27,7 +26,6 @@ class InputNode:
         self.threshold = 1
 
     def getOutput(self):
-        print("getting input for output")
         return 1 / (1 + exp(-self.inputVal))
         
 class Network:
@@ -45,10 +43,10 @@ class Network:
         current = inputVal
         for l in range(1,self.layers):
             nextVals = []
-            for i,n in enumerate(self.nodes[l]):
+            for n in self.nodes[l]:
                 nextVals.append(n.getOutput(current))
             current = nextVals
-        return current
+        return current.index(max(current))
 
     def loadInput(self, inputVector):
         for b in range(len(inputVector)):
@@ -84,6 +82,9 @@ class Network:
             Z.append(W*A + b)
             A = np.array(sigma(Z[l]))
         A = A.transpose()
+        #print("A: ", A)
+        #print("Y: ", Y)
+        #print("Z[l]: ", Z[l])
         finalError = np.absolute(A - Y).transpose()*sigmaPrime(Z[l])
         return (Z, finalError)
 
@@ -95,7 +96,6 @@ class Network:
         Delta.append(finalError)
         for l in range(self.layers - 2, -1, -1):
             W = self.weightMatr(l+1)
-            print(np.shape(W.transpose()), np.shape(Delta[-1]), np.shape(sigmaPrime(Z[l])))
             Delta.append(np.array(W.transpose()*Delta[-1])*sigmaPrime(Z[l]))
         return Delta[::-1]
 
@@ -131,19 +131,28 @@ def sigma(val):
     return 1 / (1 + exp(-val))
 
 def sigmaPrime(val):
-    return np.array(sigma(val))*np.array(sigma(np.matrix(np.ones(len(val))).transpose() - val))
+    return np.array(sigma(val))*np.array(np.matrix(np.ones(len(val))).transpose() - sigma(val))
     
 
-def createNetwork(name = "network"):
+def createNetwork(name = "network", weightsRand = True):
     file = open(name + ".txt", "r")
     lines = list(file.readlines())
     lines = [l for l in lines if l[0] != '#']
     inNodes = [InputNode() for i in range(int(lines[0]))]
     hiddenNodes = []
-    hiddenNodes.append([Node(inNodes, weights = [1 for i in range(len(inNodes))]) for i in range(int(lines[1]))])
+    if weightsRand:
+                hiddenNodes.append([Node(inNodes) for i in range(int(lines[1]))])
+    else:
+        hiddenNodes.append([Node(inNodes, weights = [1 for i in range(len(inNodes))]) for i in range(int(lines[1]))])
     for k in range(0, len(lines)-3):
-        hiddenNodes.append([Node(hiddenNodes[k], weights = [1 for i in range(len(hiddenNodes[k]))]) for i in range(int(lines[k+1]))])
-    outputNodes = [Node(hiddenNodes[-1], weights = [1 for i in range(len(hiddenNodes[-1]))]) for i in range(int(lines[-1]))]
+        if weightsRand:
+            hiddenNodes.append([Node(hiddenNodes[k]) for i in range(int(lines[k+1]))])
+        else:
+            hiddenNodes.append([Node(hiddenNodes[k], weights = [1 for i in range(len(hiddenNodes[k]))]) for i in range(int(lines[k+1]))])
+    if weightsRand:
+        outputNodes = [Node(hiddenNodes[-1]) for i in range(int(lines[-1]))]
+    else:
+        outputNodes = [Node(hiddenNodes[-1], weights = [1 for i in range(len(hiddenNodes[-1]))]) for i in range(int(lines[-1]))]
     return Network(inNodes = inNodes, hiddenNodes = hiddenNodes, outNodes = outputNodes)
 
 def loadMnist(dataset="training", num = 6000, digits=np.arange(10), path="."):
@@ -199,10 +208,9 @@ if __name__ == '__main__':
 	network = createNetwork()
 	print('network initialized')
 	i,l = loadMnist(num = 50)
-	#print('training data loaded')
-	#i = normalize(i[:50])
-	#print('data normalized')
-	#network.learn(i,l,.1)
-	#print('network taught')
-test1 = [np.array([1,.25,0])]
-labl1 = [2]
+	print('training data loaded')
+	#i = normalize(i)
+	i = [image/255 for image in i]
+	print('data normalized')
+	network.learn(i,l,.1)
+	print('network taught')

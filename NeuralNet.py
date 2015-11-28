@@ -8,6 +8,11 @@ errorCollect = []
 
 class Node:
     def __init__(self, inputs, weights = None, threshold = 0):
+        '''
+        Inputs is a numpy array of input nodes to this node.  Largely redundant right now except
+        for using its size.
+        Weights is a list of weights indexed corresponding to inputs.
+        '''
         self.inputs = inputs
         if weights != None:
             self.weights = np.array(weights, dtype=float)
